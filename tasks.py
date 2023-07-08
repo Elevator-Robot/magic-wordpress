@@ -22,16 +22,40 @@ def test(c):
     c.run("pytest -v")
 
 
-@tasks.task
-def deploy(c):
+@tasks.task(
+    help={
+        "yes": "Skip confirmation and destroy the app.",
+    }
+)
+def deploy(c, yes=False):
     c.run("cdk synth")
-    user_input = input("Do you want to deploy? (y/n): ")
-    if user_input.lower() == "y":
+    if not yes:
+        user_input = input("Do you want to deploy? (y/n): ")
+        if user_input.lower() != "y":
+            print("Deployment canceled by user.")
+            return
+        print("Deploying...")
         c.run("cdk deploy --require-approval never")
-    else:
-        print("Deployment canceled by user.")
+    elif yes:
+        print("Deploying...")
+        c.run("cdk deploy --require-approval never")
 
 
-@tasks.task
-def destroy(c):
-    c.run("cdk destroy --require-approval never")
+@tasks.task(
+    help={
+        "yes": "Skip confirmation and destroy the app.",
+    }
+)
+def destroy(c, yes=False):
+    if not yes:
+        user_input = input(
+            "Are you absolutely sure that you want to destroy your app? (y/n): "
+        )
+        if user_input.lower() != "y":
+            print("Destroy canceled by user.")
+            return
+        print("Destroying...")
+        c.run("cdk destroy --require-approval never --force")
+    elif yes:
+        print("Destroying...")
+        c.run("cdk destroy --require-approval never --force")
