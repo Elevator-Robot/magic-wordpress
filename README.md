@@ -11,6 +11,7 @@ This project deploys a WordPress site to your AWS account using GitHub Actions &
 - Run `invoke setup` to setup your virtual environment & install the dependencies
 
 ## Usage
+- Run `invoke list` to list the available tasks
 - Run `invoke test` to run the tests
 - Run `invoke build` to build the project
 - Run `invoke deploy` to deploy the project
