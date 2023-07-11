@@ -1,6 +1,6 @@
 import aws_cdk as core
 import aws_cdk.assertions as assertions
-from magic_wordpress.magic_wordpress_stack import MagicWordpressStack
+from stacks.magic_wordpress_stack import MagicWordpressStack
 
 
 def test_sqs_queue_created():
