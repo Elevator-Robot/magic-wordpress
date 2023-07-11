@@ -10,9 +10,6 @@ from invoke import tasks
 def setup(c, dev=False):
     """
     Setup the project.
-
-    Args:
-        dev (bool): Install development dependencies.
     """
     venv_exists = os.path.exists(".venv")
     if not venv_exists:
