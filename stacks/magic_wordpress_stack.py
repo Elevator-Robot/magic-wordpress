@@ -25,7 +25,7 @@ class MagicWordpressStack(Stack):
                 ),
                 ec2.SubnetConfiguration(
                     name="app-subnet",
-                    subnet_type=ec2.SubnetType.PRIVATE_WITH_NAT,
+                    subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
                     cidr_mask=24,
                 ),
                 ec2.SubnetConfiguration(
@@ -53,13 +53,22 @@ class MagicWordpressStack(Stack):
             ),
         )
 
-        task_def = ecs.TaskDefinition(
+        task_definition = ecs.TaskDefinition(
             self,
             "wordpress-task",
             compatibility=ecs.Compatibility.EC2,
             network_mode=ecs.NetworkMode.AWS_VPC,
         )
-        task_def.add_container(
+        task_definition.add_container(
             "wordpress-container",
             image=ecs.ContainerImage.from_registry("bitnami/wordpress"),
+            memory_limit_mib=512,
+        )
+
+        ecs.Ec2Service(
+            self,
+            "wordpress-service",
+            cluster=ecs_cluster,
+            task_definition=task_definition,
+            desired_count=1,
         )
