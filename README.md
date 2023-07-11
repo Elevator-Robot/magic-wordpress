@@ -8,7 +8,7 @@ This project deploys a WordPress site to your AWS account using GitHub Actions &
 ## Setup
 - Clone this repo
 - Install [invoke](http://www.pyinvoke.org/)
-- Run `invoke setup` to setup your virtual environment & install the dependencies
+- Run `invoke setup`
 
 ## Usage
 - Run `invoke setup` to setup your virtual environment & install the dependencies
