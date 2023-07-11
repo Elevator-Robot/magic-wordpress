@@ -2,12 +2,18 @@ import os
 from invoke import tasks
 
 
-@tasks.task
-def setup(c):
+@tasks.task(
+    help={
+        "dev": "Install development dependencies.",
+    }
+)
+def setup(c, dev=False):
     venv_exists = os.path.exists(".venv")
     if not venv_exists:
         c.run("python3 -m venv .venv")
     c.run(".venv/bin/pip install -r requirements.txt")
+    if dev:
+        c.run(".venv/bin/pip install -r requirements-dev.txt")
     if not venv_exists:
         print(
             """
