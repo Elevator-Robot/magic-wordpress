@@ -22,12 +22,12 @@ class MagicWordpressStack(Stack):
                 ),
                 ec2.SubnetConfiguration(
                     name = 'app-subnet',
-                    subnet_type = ec2.SubnetType.PRIVATE,
+                    subnet_type = ec2.SubnetType.PRIVATE_ISOLATED,
                     cidr_mask = 24
                 ),
                 ec2.SubnetConfiguration(
                     name = 'data-subnet',
-                    subnet_type = ec2.SubnetType.ISOLATED,
+                    subnet_type = ec2.SubnetType.PRIVATE_ISOLATED,
                     cidr_mask = 24
                 )
             ],
