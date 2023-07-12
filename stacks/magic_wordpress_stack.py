@@ -65,21 +65,33 @@ class MagicWordpressStack(Stack):
         task_definition.add_container(
             "wordpress-container",
             image=ecs.ContainerImage.from_registry(
-                "public.ecr.aws/bitnami/wordpress:latest"
+                # "public.ecr.aws/bitnami/wordpress:latest"
+                "public.ecr.aws/docker/library/hello-world:nanoserver"
             ),
             memory_reservation_mib=512,
             logging=ecs.LogDrivers.aws_logs(
                 stream_prefix="wordpress-container"
             ),
+            environment_files=[
+                ecs.EnvironmentFile.from_asset("./demo-variables.env"),
+                # ecs.EnvironmentFile.from_bucket(
+                #     bucket=ec2.Bucket.from_bucket_name(
+                #         self,
+                #         "setup-configuration-bucket",
+                #         bucket_name="magic-wordpress",
+                #     ),
+                #     object_key="config.env",
+                # ),
+            ],
         )
 
-        # ecs.Ec2Service(
-        #     self,
-        #     "ecs-service",
-        #     cluster=ecs_cluster,
-        #     task_definition=task_definition,
-        #     desired_count=1,
-        # )
+        ecs.Ec2Service(
+            self,
+            "ecs",
+            cluster=ecs_cluster,
+            task_definition=task_definition,
+            desired_count=1,
+        )
 
         resourcegroups.CfnGroup(
             self,
