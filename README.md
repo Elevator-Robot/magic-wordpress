@@ -11,14 +11,10 @@ This project deploys a WordPress site to your AWS account using GitHub Actions &
 
 ## Setup
 
-- Clone this repo
-- Install [invoke](http://www.pyinvoke.org/)
-- Run `invoke setup`
+- pip install -r requirements.txt
 
 ## Usage
-- Run `invoke setup` to setup your virtual environment & install the dependencies
 - Run `invoke list` to list the available tasks
 - Run `invoke test` to run the tests
-- Run `invoke build` to build the project
 - Run `invoke deploy` to deploy the project
 - Run `invoke destroy` to destroy the project
