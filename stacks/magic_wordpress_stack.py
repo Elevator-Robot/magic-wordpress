@@ -43,7 +43,7 @@ class MagicWordpressStack(Stack):
             vpc=vpc,
             cluster_name="magic-wordpress",
             capacity=ecs.AddCapacityOptions(
-                instance_type=ec2.InstanceType("t2.micro"),
+                instance_type=ec2.InstanceType("t3.micro"),
                 desired_capacity=1,
                 min_capacity=1,
                 max_capacity=2,
@@ -62,7 +62,7 @@ class MagicWordpressStack(Stack):
         task_definition.add_container(
             "wordpress-container",
             image=ecs.ContainerImage.from_registry("bitnami/wordpress"),
-            memory_limit_mib=512,
+            memory_limit_mib=1024,
         )
 
         ecs.Ec2Service(
