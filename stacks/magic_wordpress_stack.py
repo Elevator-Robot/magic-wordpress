@@ -61,7 +61,9 @@ class MagicWordpressStack(Stack):
         )
         task_definition.add_container(
             "wordpress-container",
-            image=ecs.ContainerImage.from_registry("bitnami/wordpress"),
+            image=ecs.ContainerImage.from_registry(
+                "public.ecr.aws/bitnami/wordpress:latest"
+            ),
             memory_limit_mib=1024,
         )
 
