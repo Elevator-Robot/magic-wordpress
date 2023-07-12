@@ -1,11 +1,16 @@
+![architecture](docs/images/wordpress.drawio.webp)
+
 # Deploy a WordPress site to AWS
+
 This project deploys a WordPress site to your AWS account using GitHub Actions & some variables that you set.
 
 ## Prerequisites
+
 - An AWS account
 - A domain name
 
 ## Setup
+
 - Clone this repo
 - Install [invoke](http://www.pyinvoke.org/)
 - Run `invoke setup`
