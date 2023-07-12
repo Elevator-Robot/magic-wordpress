@@ -3,6 +3,7 @@ from aws_cdk import (
     Stack,
     aws_ec2 as ec2,
     aws_ecs as ecs,
+    aws_resourcegroups as resourcegroups,
 )
 
 
@@ -19,17 +20,17 @@ class MagicWordpressStack(Stack):
             enable_dns_support=True,
             subnet_configuration=[
                 ec2.SubnetConfiguration(
-                    name="public-subnet",
+                    name="public-",
                     subnet_type=ec2.SubnetType.PUBLIC,
                     cidr_mask=24,
                 ),
                 ec2.SubnetConfiguration(
-                    name="app-subnet",
+                    name="app-",
                     subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
                     cidr_mask=24,
                 ),
                 ec2.SubnetConfiguration(
-                    name="data-subnet",
+                    name="data-",
                     subnet_type=ec2.SubnetType.PRIVATE_ISOLATED,
                     cidr_mask=24,
                 ),
@@ -51,11 +52,12 @@ class MagicWordpressStack(Stack):
                     subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
                 ),
             ),
+            container_insights=True,
         )
 
         task_definition = ecs.TaskDefinition(
             self,
-            "wordpress-task",
+            "ecs-task",
             compatibility=ecs.Compatibility.EC2,
             network_mode=ecs.NetworkMode.AWS_VPC,
         )
@@ -64,13 +66,21 @@ class MagicWordpressStack(Stack):
             image=ecs.ContainerImage.from_registry(
                 "public.ecr.aws/bitnami/wordpress:latest"
             ),
-            memory_limit_mib=1024,
         )
 
-        ecs.Ec2Service(
+        # ecs.Ec2Service(
+        #     self,
+        #     "ecs-service",
+        #     cluster=ecs_cluster,
+        #     task_definition=task_definition,
+        #     desired_count=1,
+        # )
+
+        resourcegroups.CfnGroup(
             self,
-            "wordpress-service",
-            cluster=ecs_cluster,
-            task_definition=task_definition,
-            desired_count=1,
+            "resource-group",
+            name="magic-wordpress",
+            resource_query=resourcegroups.CfnGroup.ResourceQueryProperty(
+                type="CLOUDFORMATION_STACK_1_0",
+            ),
         )
