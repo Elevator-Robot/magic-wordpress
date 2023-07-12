@@ -60,11 +60,16 @@ class MagicWordpressStack(Stack):
             "ecs-task",
             compatibility=ecs.Compatibility.EC2,
             network_mode=ecs.NetworkMode.AWS_VPC,
+            memory_mib="512",
         )
         task_definition.add_container(
             "wordpress-container",
             image=ecs.ContainerImage.from_registry(
                 "public.ecr.aws/bitnami/wordpress:latest"
+            ),
+            memory_reservation_mib=512,
+            logging=ecs.LogDrivers.aws_logs(
+                stream_prefix="wordpress-container"
             ),
         )
 
