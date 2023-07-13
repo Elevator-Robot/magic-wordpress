@@ -13,3 +13,5 @@ python-dateutil==2.8.2
 six==1.16.0
 typeguard==2.13.3
 typing_extensions==4.7.1
+pytest==6.2.5
+invoke==2.1.3
