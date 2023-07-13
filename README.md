@@ -1,6 +1,6 @@
 # Magic WordPress
 
-[![Tests](https://github.com/Elevator-Robot/magic-wordpress/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Elevator-Robot/magic-wordpress/actions/workflows/ci.yml)
+[![Run Tests](https://github.com/Elevator-Robot/magic-wordpress/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Elevator-Robot/magic-wordpress/actions/workflows/ci.yml)
 
 ## Architecture
 ![architecture](docs/images/wordpress.drawio.webp)
