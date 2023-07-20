@@ -45,9 +45,6 @@ class MagicWordpressStack(Stack):
             cluster_name="magic-wordpress",
             capacity=ecs.AddCapacityOptions(
                 instance_type=ec2.InstanceType("t3.micro"),
-                desired_capacity=1,
-                min_capacity=1,
-                max_capacity=2,
                 vpc_subnets=ec2.SubnetSelection(
                     subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
                 ),
@@ -60,29 +57,19 @@ class MagicWordpressStack(Stack):
             "ecs-task",
             compatibility=ecs.Compatibility.EC2,
             network_mode=ecs.NetworkMode.AWS_VPC,
-            memory_mib="512",
         )
         task_definition.add_container(
             "wordpress-container",
             image=ecs.ContainerImage.from_registry(
                 # "public.ecr.aws/bitnami/wordpress:latest"
-                "public.ecr.aws/docker/library/hello-world:nanoserver"
+                "public.ecr.aws/bitnami/nginx:latest"
             ),
             memory_reservation_mib=512,
+            cpu=1,
             logging=ecs.LogDrivers.aws_logs(
                 stream_prefix="wordpress-container"
             ),
-            environment_files=[
-                ecs.EnvironmentFile.from_asset("./demo-variables.env"),
-                # ecs.EnvironmentFile.from_bucket(
-                #     bucket=ec2.Bucket.from_bucket_name(
-                #         self,
-                #         "setup-configuration-bucket",
-                #         bucket_name="magic-wordpress",
-                #     ),
-                #     object_key="config.env",
-                # ),
-            ],
+            environment_files=[],
         )
 
         ecs.Ec2Service(
