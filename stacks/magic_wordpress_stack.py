@@ -4,7 +4,10 @@ from aws_cdk import (
     aws_ec2 as ec2,
     aws_ecs as ecs,
     aws_resourcegroups as resourcegroups,
-    CfnParameter,
+    # CfnParameter,
+    CfnOutput,
+    aws_rds as rds,
+    aws_iam as iam,
 )
 
 
@@ -113,4 +116,31 @@ class MagicWordpressStack(Stack):
             cluster=ecs_cluster,
             task_definition=task_definition,
             desired_count=1,
+        )
+
+        db_cluster = rds.DatabaseCluster(
+            self,
+            "Database",
+            engine=rds.DatabaseClusterEngine.aurora_postgres(
+                version=rds.AuroraPostgresEngineVersion.VER_15_2
+            ),
+            credentials=rds.Credentials.from_generated_secret("clusteradmin"),
+            writer=rds.ClusterInstance.provisioned(
+                "writer", publicly_accessible=False
+            ),
+            readers=[
+                rds.ClusterInstance.provisioned("reader1", promotion_tier=1),
+                rds.ClusterInstance.serverless_v2("reader2"),
+            ],
+            vpc_subnets=ec2.SubnetSelection(
+                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
+            ),
+            vpc=vpc,
+        )
+
+        CfnOutput(
+            self,
+            "database-endpoint",
+            value=db_cluster.cluster_endpoint.hostname,
+            description="Database Endpoint",
         )
