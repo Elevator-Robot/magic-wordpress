@@ -8,6 +8,7 @@ from aws_cdk import (
     CfnOutput,
     aws_rds as rds,
     aws_iam as iam,
+    aws_secretsmanager as secretsmanager,
 )
 
 
@@ -76,6 +77,37 @@ class MagicWordpressStack(Stack):
             nat_gateways=1,
         )
 
+        db_cluster = rds.DatabaseCluster(
+            self,
+            "Database",
+            engine=rds.DatabaseClusterEngine.aurora_postgres(
+                version=rds.AuroraPostgresEngineVersion.VER_15_2
+            ),
+            credentials=rds.Credentials.from_generated_secret(
+                secret_name="postgressCredentials",
+                username="postgresadmin",
+            ),
+            default_database_name="wordpress",
+            writer=rds.ClusterInstance.provisioned(
+                "writer", publicly_accessible=False
+            ),
+            readers=[
+                rds.ClusterInstance.provisioned("reader1", promotion_tier=1),
+                rds.ClusterInstance.serverless_v2("reader2"),
+            ],
+            vpc_subnets=ec2.SubnetSelection(
+                subnet_type=ec2.SubnetType.PRIVATE_ISOLATED,
+                one_per_az=True,
+            ),
+            vpc=vpc,
+        )
+
+        secrets = secretsmanager.Secret.from_secret_name_v2(
+            self,
+            "secrets",
+            secret_name="postgressCredentials",
+        )
+
         ecs_cluster = ecs.Cluster(
             self,
             "ecs-cluster",
@@ -84,7 +116,8 @@ class MagicWordpressStack(Stack):
             capacity=ecs.AddCapacityOptions(
                 instance_type=ec2.InstanceType("t3.micro"),
                 vpc_subnets=ec2.SubnetSelection(
-                    subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
+                    subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
+                    one_per_az=True,
                 ),
             ),
             container_insights=True,
@@ -96,18 +129,37 @@ class MagicWordpressStack(Stack):
             compatibility=ecs.Compatibility.EC2,
             network_mode=ecs.NetworkMode.AWS_VPC,
         )
-        task_definition.add_container(
+        container = task_definition.add_container(
             "wordpress-container",
             image=ecs.ContainerImage.from_registry(
                 # "public.ecr.aws/bitnami/wordpress:latest"
                 "public.ecr.aws/bitnami/nginx:latest"
             ),
             memory_reservation_mib=512,
-            cpu=1,
+            cpu=256,
             logging=ecs.LogDrivers.aws_logs(
                 stream_prefix="wordpress-container"
             ),
-            environment_files=[],
+            environment={
+                "WORDPRESS_DATABASE_HOST": secrets.secret_value_from_json(
+                    "host"
+                ).to_string(),
+                "WORDPRESS_DATABASE_NAME": secrets.secret_value_from_json(
+                    "dbname"
+                ).to_string(),
+                "WORDPRESS_DATABASE_USER": secrets.secret_value_from_json(
+                    "username"
+                ).to_string(),
+                "WORDPRESS_DATABASE_PASSWORD": secrets.secret_value_from_json(
+                    "password"
+                ).to_string(),
+            },
+        )
+        container.add_port_mappings(
+            ecs.PortMapping(container_port=8080, host_port=8080)
+        )
+        container.add_port_mappings(
+            ecs.PortMapping(container_port=8443, host_port=8443)
         )
 
         ecs.Ec2Service(
@@ -116,26 +168,6 @@ class MagicWordpressStack(Stack):
             cluster=ecs_cluster,
             task_definition=task_definition,
             desired_count=1,
-        )
-
-        db_cluster = rds.DatabaseCluster(
-            self,
-            "Database",
-            engine=rds.DatabaseClusterEngine.aurora_postgres(
-                version=rds.AuroraPostgresEngineVersion.VER_15_2
-            ),
-            credentials=rds.Credentials.from_generated_secret("clusteradmin"),
-            writer=rds.ClusterInstance.provisioned(
-                "writer", publicly_accessible=False
-            ),
-            readers=[
-                rds.ClusterInstance.provisioned("reader1", promotion_tier=1),
-                rds.ClusterInstance.serverless_v2("reader2"),
-            ],
-            vpc_subnets=ec2.SubnetSelection(
-                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
-            ),
-            vpc=vpc,
         )
 
         CfnOutput(
