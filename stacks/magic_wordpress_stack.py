@@ -8,7 +8,7 @@ from aws_cdk import (
     CfnOutput,
     aws_rds as rds,
     aws_iam as iam,
-    aws_secretsmanager as secretsmanager,
+    # aws_secretsmanager as secretsmanager,
 )
 
 
@@ -48,8 +48,6 @@ class MagicWordpressStack(Stack):
             ),
         )
 
-        # Setup VPC
-
         vpc = ec2.Vpc(
             self,
             "vpc",
@@ -84,28 +82,19 @@ class MagicWordpressStack(Stack):
                 version=rds.AuroraPostgresEngineVersion.VER_15_2
             ),
             credentials=rds.Credentials.from_generated_secret(
+                username="pgadmin",
                 secret_name="postgressCredentials",
-                username="postgresadmin",
             ),
             default_database_name="wordpress",
-            writer=rds.ClusterInstance.provisioned(
-                "writer", publicly_accessible=False
-            ),
+            writer=rds.ClusterInstance.serverless_v2("writer"),
             readers=[
-                rds.ClusterInstance.provisioned("reader1", promotion_tier=1),
-                rds.ClusterInstance.serverless_v2("reader2"),
+                rds.ClusterInstance.serverless_v2("reader"),
             ],
             vpc_subnets=ec2.SubnetSelection(
                 subnet_type=ec2.SubnetType.PRIVATE_ISOLATED,
                 one_per_az=True,
             ),
             vpc=vpc,
-        )
-
-        secrets = secretsmanager.Secret.from_secret_name_v2(
-            self,
-            "secrets",
-            secret_name="postgressCredentials",
         )
 
         ecs_cluster = ecs.Cluster(
@@ -140,19 +129,27 @@ class MagicWordpressStack(Stack):
             logging=ecs.LogDrivers.aws_logs(
                 stream_prefix="wordpress-container"
             ),
-            environment={
-                "WORDPRESS_DATABASE_HOST": secrets.secret_value_from_json(
-                    "host"
-                ).to_string(),
-                "WORDPRESS_DATABASE_NAME": secrets.secret_value_from_json(
-                    "dbname"
-                ).to_string(),
-                "WORDPRESS_DATABASE_USER": secrets.secret_value_from_json(
-                    "username"
-                ).to_string(),
-                "WORDPRESS_DATABASE_PASSWORD": secrets.secret_value_from_json(
-                    "password"
-                ).to_string(),
+            secrets={
+                "WORDPRESS_DATABASE_HOST": ecs.Secret.from_secrets_manager(
+                    db_cluster.secret,
+                    field="host",
+                ),
+                "WORDPRESS_DATABASE_PORT": ecs.Secret.from_secrets_manager(
+                    db_cluster.secret,
+                    field="port",
+                ),
+                "WORDPRESS_DATABASE_NAME": ecs.Secret.from_secrets_manager(
+                    db_cluster.secret,
+                    field="dbname",
+                ),
+                "WORDPRESS_DATABASE_USER": ecs.Secret.from_secrets_manager(
+                    db_cluster.secret,
+                    field="username",
+                ),
+                "WORDPRESS_DATABASE_PASSWORD": ecs.Secret.from_secrets_manager(
+                    db_cluster.secret,
+                    field="password",
+                ),
             },
         )
         container.add_port_mappings(
