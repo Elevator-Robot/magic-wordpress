@@ -8,7 +8,7 @@ from aws_cdk import (
     CfnOutput,
     aws_rds as rds,
     aws_iam as iam,
-    aws_secretsmanager as secretsmanager,
+    # aws_secretsmanager as secretsmanager,
 )
 
 
@@ -77,23 +77,22 @@ class MagicWordpressStack(Stack):
             nat_gateways=1,
         )
 
+        secrets = rds.Credentials.from_generated_secret(
+            username="pgadmin",
+            secret_name="postgressCredentials",
+        )
+
         db_cluster = rds.DatabaseCluster(
             self,
             "Database",
             engine=rds.DatabaseClusterEngine.aurora_postgres(
                 version=rds.AuroraPostgresEngineVersion.VER_15_2
             ),
-            credentials=rds.Credentials.from_generated_secret(
-                secret_name="postgressCredentials",
-                username="postgresadmin",
-            ),
+            credentials=secrets,
             default_database_name="wordpress",
-            writer=rds.ClusterInstance.provisioned(
-                "writer", publicly_accessible=False
-            ),
+            writer=rds.ClusterInstance.serverless_v2("writer"),
             readers=[
-                rds.ClusterInstance.provisioned("reader1", promotion_tier=1),
-                rds.ClusterInstance.serverless_v2("reader2"),
+                rds.ClusterInstance.serverless_v2("reader"),
             ],
             vpc_subnets=ec2.SubnetSelection(
                 subnet_type=ec2.SubnetType.PRIVATE_ISOLATED,
@@ -102,73 +101,69 @@ class MagicWordpressStack(Stack):
             vpc=vpc,
         )
 
-        secrets = secretsmanager.Secret.from_secret_name_v2(
-            self,
-            "secrets",
-            secret_name="postgressCredentials",
-        )
+        # ecs_cluster = ecs.Cluster(
+        #     self,
+        #     "ecs-cluster",
+        #     vpc=vpc,
+        #     cluster_name="magic-wordpress",
+        #     capacity=ecs.AddCapacityOptions(
+        #         instance_type=ec2.InstanceType("t3.micro"),
+        #         vpc_subnets=ec2.SubnetSelection(
+        #             subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        #             one_per_az=True,
+        #         ),
+        #     ),
+        #     container_insights=True,
+        # )
 
-        ecs_cluster = ecs.Cluster(
-            self,
-            "ecs-cluster",
-            vpc=vpc,
-            cluster_name="magic-wordpress",
-            capacity=ecs.AddCapacityOptions(
-                instance_type=ec2.InstanceType("t3.micro"),
-                vpc_subnets=ec2.SubnetSelection(
-                    subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
-                    one_per_az=True,
-                ),
-            ),
-            container_insights=True,
-        )
+        # secrets.grant_read(ecs_cluster.task_execution_role)
 
-        task_definition = ecs.TaskDefinition(
-            self,
-            "ecs-task",
-            compatibility=ecs.Compatibility.EC2,
-            network_mode=ecs.NetworkMode.AWS_VPC,
-        )
-        container = task_definition.add_container(
-            "wordpress-container",
-            image=ecs.ContainerImage.from_registry(
-                # "public.ecr.aws/bitnami/wordpress:latest"
-                "public.ecr.aws/bitnami/nginx:latest"
-            ),
-            memory_reservation_mib=512,
-            cpu=256,
-            logging=ecs.LogDrivers.aws_logs(
-                stream_prefix="wordpress-container"
-            ),
-            environment={
-                "WORDPRESS_DATABASE_HOST": secrets.secret_value_from_json(
-                    "host"
-                ).to_string(),
-                "WORDPRESS_DATABASE_NAME": secrets.secret_value_from_json(
-                    "dbname"
-                ).to_string(),
-                "WORDPRESS_DATABASE_USER": secrets.secret_value_from_json(
-                    "username"
-                ).to_string(),
-                "WORDPRESS_DATABASE_PASSWORD": secrets.secret_value_from_json(
-                    "password"
-                ).to_string(),
-            },
-        )
-        container.add_port_mappings(
-            ecs.PortMapping(container_port=8080, host_port=8080)
-        )
-        container.add_port_mappings(
-            ecs.PortMapping(container_port=8443, host_port=8443)
-        )
+        # task_definition = ecs.TaskDefinition(
+        #     self,
+        #     "ecs-task",
+        #     compatibility=ecs.Compatibility.EC2,
+        #     network_mode=ecs.NetworkMode.AWS_VPC,
+        # )
+        # container = task_definition.add_container(
+        #     "wordpress-container",
+        #     image=ecs.ContainerImage.from_registry(
+        #         # "public.ecr.aws/bitnami/wordpress:latest"
+        #         "public.ecr.aws/bitnami/nginx:latest"
+        #     ),
+        #     memory_reservation_mib=512,
+        #     cpu=256,
+        #     logging=ecs.LogDrivers.aws_logs(
+        #         stream_prefix="wordpress-container"
+        #     ),
+        #     secrets={
+        #         "WORDPRESS_DATABASE_HOST": ecs.Secret.from_secrets_manager(
+        #             secrets, "host"
+        #         ),
+        #         "WORDPRESS_DATABASE_NAME": ecs.Secret.from_secrets_manager(
+        #             secrets, "dbname"
+        #         ),
+        #         "WORDPRESS_DATABASE_USER": ecs.Secret.from_secrets_manager(
+        #             secrets, "username"
+        #         ),
+        #         "WORDPRESS_DATABASE_PASSWORD": ecs.Secret.from_secrets_manager(
+        #             secrets, "password"
+        #         ),
+        #     },
+        # )
+        # container.add_port_mappings(
+        #     ecs.PortMapping(container_port=8080, host_port=8080)
+        # )
+        # container.add_port_mappings(
+        #     ecs.PortMapping(container_port=8443, host_port=8443)
+        # )
 
-        ecs.Ec2Service(
-            self,
-            "ecs",
-            cluster=ecs_cluster,
-            task_definition=task_definition,
-            desired_count=1,
-        )
+        # ecs.Ec2Service(
+        #     self,
+        #     "ecs",
+        #     cluster=ecs_cluster,
+        #     task_definition=task_definition,
+        #     desired_count=1,
+        # )
 
         CfnOutput(
             self,
