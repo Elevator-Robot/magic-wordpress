@@ -7,8 +7,8 @@ from aws_cdk import (
     # CfnParameter,
     CfnOutput,
     aws_rds as rds,
-    aws_iam as iam,
-    # aws_secretsmanager as secretsmanager,
+    # aws_iam as iam,
+    aws_servicediscovery as servicediscovery,
 )
 
 
@@ -102,6 +102,11 @@ class MagicWordpressStack(Stack):
             "ecs-cluster",
             vpc=vpc,
             cluster_name="magic-wordpress",
+            default_cloud_map_namespace=ecs.CloudMapNamespaceOptions(
+                name="wordpress",
+                type=servicediscovery.NamespaceType.DNS_PRIVATE,
+                vpc=vpc,
+            ),
             capacity=ecs.AddCapacityOptions(
                 instance_type=ec2.InstanceType("t3.micro"),
                 vpc_subnets=ec2.SubnetSelection(
@@ -153,10 +158,13 @@ class MagicWordpressStack(Stack):
             },
         )
         container.add_port_mappings(
-            ecs.PortMapping(container_port=8080, host_port=8080)
+            ecs.PortMapping(container_port=80, host_port=80, name="temp-http")
         )
         container.add_port_mappings(
-            ecs.PortMapping(container_port=8443, host_port=8443)
+            ecs.PortMapping(container_port=8080, host_port=8080, name="http")
+        )
+        container.add_port_mappings(
+            ecs.PortMapping(container_port=8443, host_port=8443, name="https")
         )
 
         ecs.Ec2Service(
@@ -165,6 +173,11 @@ class MagicWordpressStack(Stack):
             cluster=ecs_cluster,
             task_definition=task_definition,
             desired_count=1,
+            cloud_map_options=ecs.CloudMapOptions(
+                name="wordpress",
+                container_port=80,
+                dns_record_type=servicediscovery.DnsRecordType.A,
+            ),
         )
 
         CfnOutput(
