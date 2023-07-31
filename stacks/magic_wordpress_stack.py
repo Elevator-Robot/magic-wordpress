@@ -7,7 +7,8 @@ from aws_cdk import (
     # CfnParameter,
     CfnOutput,
     aws_rds as rds,
-    aws_iam as iam,
+    # aws_iam as iam,
+    aws_servicediscovery as cloudmap,
 )
 
 
@@ -47,8 +48,6 @@ class MagicWordpressStack(Stack):
             ),
         )
 
-        # Setup VPC
-
         vpc = ec2.Vpc(
             self,
             "vpc",
@@ -58,7 +57,7 @@ class MagicWordpressStack(Stack):
             enable_dns_support=True,
             subnet_configuration=[
                 ec2.SubnetConfiguration(
-                    name="public-",
+                    name="protected-",
                     subnet_type=ec2.SubnetType.PUBLIC,
                     cidr_mask=24,
                 ),
@@ -76,15 +75,44 @@ class MagicWordpressStack(Stack):
             nat_gateways=1,
         )
 
+        db_cluster = rds.DatabaseCluster(
+            self,
+            "Database",
+            engine=rds.DatabaseClusterEngine.aurora_postgres(
+                version=rds.AuroraPostgresEngineVersion.VER_15_2
+            ),
+            credentials=rds.Credentials.from_generated_secret(
+                username="pgadmin",
+                secret_name="postgressCredentials",
+            ),
+            default_database_name="wordpress",
+            writer=rds.ClusterInstance.serverless_v2("writer"),
+            readers=[
+                rds.ClusterInstance.serverless_v2("reader"),
+            ],
+            vpc_subnets=ec2.SubnetSelection(
+                subnet_type=ec2.SubnetType.PRIVATE_ISOLATED,
+                one_per_az=True,
+            ),
+            vpc=vpc,
+            storage_encrypted=True,
+        )
+
         ecs_cluster = ecs.Cluster(
             self,
             "ecs-cluster",
             vpc=vpc,
             cluster_name="magic-wordpress",
+            default_cloud_map_namespace=ecs.CloudMapNamespaceOptions(
+                name="wordpress",
+                type=cloudmap.NamespaceType.DNS_PUBLIC,
+                vpc=vpc,
+            ),
             capacity=ecs.AddCapacityOptions(
                 instance_type=ec2.InstanceType("t3.micro"),
                 vpc_subnets=ec2.SubnetSelection(
-                    subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
+                    subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
+                    one_per_az=True,
                 ),
             ),
             container_insights=True,
@@ -96,18 +124,48 @@ class MagicWordpressStack(Stack):
             compatibility=ecs.Compatibility.EC2,
             network_mode=ecs.NetworkMode.AWS_VPC,
         )
-        task_definition.add_container(
+        container = task_definition.add_container(
             "wordpress-container",
             image=ecs.ContainerImage.from_registry(
                 # "public.ecr.aws/bitnami/wordpress:latest"
                 "public.ecr.aws/bitnami/nginx:latest"
             ),
             memory_reservation_mib=512,
-            cpu=1,
+            cpu=256,
             logging=ecs.LogDrivers.aws_logs(
                 stream_prefix="wordpress-container"
             ),
-            environment_files=[],
+            secrets={
+                "WORDPRESS_DATABASE_HOST": ecs.Secret.from_secrets_manager(
+                    db_cluster.secret,
+                    field="host",
+                ),
+                "WORDPRESS_DATABASE_PORT": ecs.Secret.from_secrets_manager(
+                    db_cluster.secret,
+                    field="port",
+                ),
+                "WORDPRESS_DATABASE_NAME": ecs.Secret.from_secrets_manager(
+                    db_cluster.secret,
+                    field="dbname",
+                ),
+                "WORDPRESS_DATABASE_USER": ecs.Secret.from_secrets_manager(
+                    db_cluster.secret,
+                    field="username",
+                ),
+                "WORDPRESS_DATABASE_PASSWORD": ecs.Secret.from_secrets_manager(
+                    db_cluster.secret,
+                    field="password",
+                ),
+            },
+        )
+        container.add_port_mappings(
+            ecs.PortMapping(container_port=80, host_port=80, name="temp-http")
+        )
+        container.add_port_mappings(
+            ecs.PortMapping(container_port=8080, host_port=8080, name="http")
+        )
+        container.add_port_mappings(
+            ecs.PortMapping(container_port=8443, host_port=8443, name="https")
         )
 
         ecs.Ec2Service(
@@ -116,26 +174,12 @@ class MagicWordpressStack(Stack):
             cluster=ecs_cluster,
             task_definition=task_definition,
             desired_count=1,
-        )
-
-        db_cluster = rds.DatabaseCluster(
-            self,
-            "Database",
-            engine=rds.DatabaseClusterEngine.aurora_postgres(
-                version=rds.AuroraPostgresEngineVersion.VER_15_2
+            cloud_map_options=ecs.CloudMapOptions(
+                name="wordpress",
+                container_port=80,
+                dns_record_type=cloudmap.DnsRecordType.A,
+                container=container,
             ),
-            credentials=rds.Credentials.from_generated_secret("clusteradmin"),
-            writer=rds.ClusterInstance.provisioned(
-                "writer", publicly_accessible=False
-            ),
-            readers=[
-                rds.ClusterInstance.provisioned("reader1", promotion_tier=1),
-                rds.ClusterInstance.serverless_v2("reader2"),
-            ],
-            vpc_subnets=ec2.SubnetSelection(
-                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
-            ),
-            vpc=vpc,
         )
 
         CfnOutput(
