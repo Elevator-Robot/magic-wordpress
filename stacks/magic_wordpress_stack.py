@@ -8,7 +8,7 @@ from aws_cdk import (
     CfnOutput,
     aws_rds as rds,
     # aws_iam as iam,
-    aws_servicediscovery as servicediscovery,
+    aws_servicediscovery as cloudmap,
 )
 
 
@@ -57,7 +57,7 @@ class MagicWordpressStack(Stack):
             enable_dns_support=True,
             subnet_configuration=[
                 ec2.SubnetConfiguration(
-                    name="public-",
+                    name="protected-",
                     subnet_type=ec2.SubnetType.PUBLIC,
                     cidr_mask=24,
                 ),
@@ -95,6 +95,7 @@ class MagicWordpressStack(Stack):
                 one_per_az=True,
             ),
             vpc=vpc,
+            storage_encrypted=True,
         )
 
         ecs_cluster = ecs.Cluster(
@@ -104,7 +105,7 @@ class MagicWordpressStack(Stack):
             cluster_name="magic-wordpress",
             default_cloud_map_namespace=ecs.CloudMapNamespaceOptions(
                 name="wordpress",
-                type=servicediscovery.NamespaceType.DNS_PRIVATE,
+                type=cloudmap.NamespaceType.DNS_PUBLIC,
                 vpc=vpc,
             ),
             capacity=ecs.AddCapacityOptions(
@@ -176,7 +177,8 @@ class MagicWordpressStack(Stack):
             cloud_map_options=ecs.CloudMapOptions(
                 name="wordpress",
                 container_port=80,
-                dns_record_type=servicediscovery.DnsRecordType.A,
+                dns_record_type=cloudmap.DnsRecordType.A,
+                container=container,
             ),
         )
 
