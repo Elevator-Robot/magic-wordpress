@@ -5,10 +5,11 @@ from aws_cdk import (
     aws_ecs as ecs,
     aws_resourcegroups as resourcegroups,
     # CfnParameter,
-    CfnOutput,
+    # CfnOutput,
     aws_rds as rds,
     # aws_iam as iam,
     aws_servicediscovery as servicediscovery,
+    aws_elasticloadbalancingv2 as lb,
 )
 
 
@@ -120,8 +121,10 @@ class MagicWordpressStack(Stack):
         task_definition = ecs.TaskDefinition(
             self,
             "ecs-task",
-            compatibility=ecs.Compatibility.EC2,
+            compatibility=ecs.Compatibility.FARGATE,
             network_mode=ecs.NetworkMode.AWS_VPC,
+            cpu="256",
+            memory_mib="512",
         )
         container = task_definition.add_container(
             "wordpress-container",
@@ -130,7 +133,7 @@ class MagicWordpressStack(Stack):
                 "public.ecr.aws/bitnami/nginx:latest"
             ),
             memory_reservation_mib=512,
-            cpu=256,
+            # cpu=256,
             logging=ecs.LogDrivers.aws_logs(
                 stream_prefix="wordpress-container"
             ),
@@ -167,22 +170,57 @@ class MagicWordpressStack(Stack):
             ecs.PortMapping(container_port=8443, host_port=8443, name="https")
         )
 
-        ecs.Ec2Service(
+        # service = ecs.Ec2Service(
+        #     self,
+        #     "ecs",
+        #     cluster=ecs_cluster,
+        #     task_definition=task_definition,
+        #     desired_count=1,
+        #     cloud_map_options=ecs.CloudMapOptions(
+        #         name="wordpress",
+        #         container_port=80,
+        #         dns_record_type=servicediscovery.DnsRecordType.A,
+        #     ),
+        # )
+
+        # Fargate service
+        # service = ecs.FargateService(
+        #     self,
+        #     "fargate-service",
+        #     cluster=ecs_cluster,
+        #     vpc_subnets=ec2.SubnetSelection(
+        #         subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        #     ),
+        #     task_definition=task_definition,
+        #     cloud_map_options=ecs.CloudMapOptions(
+        #         name="wordpress",
+        #         container_port=80,
+        #         dns_record_type=servicediscovery.DnsRecordType.A,
+        #     ),
+        # )
+
+        # Create a target group for the ALB
+        target_group = lb.ApplicationTargetGroup(
             self,
-            "ecs",
-            cluster=ecs_cluster,
-            task_definition=task_definition,
-            desired_count=1,
-            cloud_map_options=ecs.CloudMapOptions(
-                name="wordpress",
-                container_port=80,
-                dns_record_type=servicediscovery.DnsRecordType.A,
-            ),
+            "ecs-target-group",
+            vpc=vpc,
+            port=80,
+        )
+        # target_group.add_target(service)
+
+        alb = lb.ApplicationLoadBalancer(
+            self,
+            "alb",
+            vpc=vpc,
+            internet_facing=True,
         )
 
-        CfnOutput(
-            self,
-            "database-endpoint",
-            value=db_cluster.cluster_endpoint.hostname,
-            description="Database Endpoint",
+        listener = alb.add_listener(
+            "listener",
+            port=80,
+            open=True,
+        )
+
+        listener.add_target_groups(
+            "ecs-target-group", target_groups=[target_group]
         )
