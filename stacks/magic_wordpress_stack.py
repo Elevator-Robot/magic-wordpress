@@ -7,7 +7,7 @@ from aws_cdk import (
     # CfnParameter,
     # CfnOutput,
     aws_rds as rds,
-    # aws_iam as iam,
+    aws_iam as iam,
     aws_servicediscovery as servicediscovery,
     aws_elasticloadbalancingv2 as lb,
 )
@@ -108,14 +108,8 @@ class MagicWordpressStack(Stack):
                 type=servicediscovery.NamespaceType.DNS_PRIVATE,
                 vpc=vpc,
             ),
-            capacity=ecs.AddCapacityOptions(
-                instance_type=ec2.InstanceType("t3.micro"),
-                vpc_subnets=ec2.SubnetSelection(
-                    subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
-                    one_per_az=True,
-                ),
-            ),
             container_insights=True,
+            enable_fargate_capacity_providers=True,
         )
 
         task_definition = ecs.TaskDefinition(
@@ -197,6 +191,29 @@ class MagicWordpressStack(Stack):
         #         container_port=80,
         #         dns_record_type=servicediscovery.DnsRecordType.A,
         #     ),
+        # )
+
+        # add permissions to the task role to access secrets and to access the database
+        task_definition.task_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "secretsmanager:GetSecretValue",
+                ],
+                resources=[
+                    db_cluster.secret.secret_arn,
+                ],
+            )
+        )
+
+        # task_definition.task_role.add_to_policy(
+        #     iam.PolicyStatement(
+        #         actions=[
+        #             "rds-db:connect",
+        #         ],
+        #         resources=[
+        #             db_cluster.
+        #         ],
+        #     )
         # )
 
         # Create a target group for the ALB
