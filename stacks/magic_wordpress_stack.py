@@ -8,7 +8,7 @@ from aws_cdk import (
     # CfnOutput,
     aws_rds as rds,
     # aws_iam as iam,
-    aws_servicediscovery as servicediscovery,
+    aws_servicediscovery as cloudmap,
     aws_elasticloadbalancingv2 as lb,
 )
 
@@ -174,27 +174,32 @@ class MagicWordpressStack(Stack):
             assign_public_ip=True,
         )
 
-        # target_group = lb.ApplicationTargetGroup(
-        #     self,
-        #     "ecs-target-group",
-        #     vpc=vpc,
-        #     port=80,
-        # )
-        # target_group.add_target(service)
+        target_group = lb.ApplicationTargetGroup(
+            self,
+            "ecs-target-group",
+            vpc=vpc,
+            port=80,
+            targets=[service],
+        )
+        target_group.add_health_check(
+            port="80",
+            path="/wp-admin/install.php",
+            protocol=lb.Protocol.HTTP,
+        )
 
-        # alb = lb.ApplicationLoadBalancer(
-        #     self,
-        #     "alb",
-        #     vpc=vpc,
-        #     internet_facing=True,
-        # )
+        alb = lb.ApplicationLoadBalancer(
+            self,
+            "alb",
+            vpc=vpc,
+            internet_facing=True,
+        )
 
-        # listener = alb.add_listener(
-        #     "listener",
-        #     port=80,
-        #     open=True,
-        # )
+        listener = alb.add_listener(
+            "listener",
+            port=80,
+            open=True,
+        )
 
-        # listener.add_target_groups(
-        #     "ecs-target-group", target_groups=[target_group]
-        # )
+        listener.add_target_groups(
+            "ecs-target-group", target_groups=[target_group]
+        )
