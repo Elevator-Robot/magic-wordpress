@@ -7,7 +7,7 @@ from aws_cdk import (
     # CfnParameter,
     # CfnOutput,
     aws_rds as rds,
-    aws_iam as iam,
+    # aws_iam as iam,
     aws_servicediscovery as servicediscovery,
     aws_elasticloadbalancingv2 as lb,
 )
@@ -109,7 +109,6 @@ class MagicWordpressStack(Stack):
                 vpc=vpc,
             ),
             container_insights=True,
-            enable_fargate_capacity_providers=True,
         )
 
         task_definition = ecs.TaskDefinition(
@@ -123,11 +122,10 @@ class MagicWordpressStack(Stack):
         container = task_definition.add_container(
             "wordpress-container",
             image=ecs.ContainerImage.from_registry(
-                # "public.ecr.aws/bitnami/wordpress:latest"
-                "public.ecr.aws/bitnami/nginx:latest"
+                "public.ecr.aws/bitnami/wordpress:latest"
+                # "public.ecr.aws/bitnami/nginx:latest"
             ),
             memory_reservation_mib=512,
-            # cpu=256,
             logging=ecs.LogDrivers.aws_logs(
                 stream_prefix="wordpress-container"
             ),
@@ -164,80 +162,38 @@ class MagicWordpressStack(Stack):
             ecs.PortMapping(container_port=8443, host_port=8443, name="https")
         )
 
-        # service = ecs.Ec2Service(
-        #     self,
-        #     "ecs",
-        #     cluster=ecs_cluster,
-        #     task_definition=task_definition,
-        #     desired_count=1,
-        #     cloud_map_options=ecs.CloudMapOptions(
-        #         name="wordpress",
-        #         container_port=80,
-        #         dns_record_type=servicediscovery.DnsRecordType.A,
-        #     ),
-        # )
-
-        # Fargate service
-        # service = ecs.FargateService(
-        #     self,
-        #     "fargate-service",
-        #     cluster=ecs_cluster,
-        #     vpc_subnets=ec2.SubnetSelection(
-        #         subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
-        #     ),
-        #     task_definition=task_definition,
-        #     cloud_map_options=ecs.CloudMapOptions(
-        #         name="wordpress",
-        #         container_port=80,
-        #         dns_record_type=servicediscovery.DnsRecordType.A,
-        #     ),
-        # )
-
-        # add permissions to the task role to access secrets and to access the database
-        task_definition.task_role.add_to_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "secretsmanager:GetSecretValue",
-                ],
-                resources=[
-                    db_cluster.secret.secret_arn,
-                ],
-            )
-        )
-
-        # task_definition.task_role.add_to_policy(
-        #     iam.PolicyStatement(
-        #         actions=[
-        #             "rds-db:connect",
-        #         ],
-        #         resources=[
-        #             db_cluster.
-        #         ],
-        #     )
-        # )
-
-        # Create a target group for the ALB
-        target_group = lb.ApplicationTargetGroup(
+        service = ecs.FargateService(
             self,
-            "ecs-target-group",
-            vpc=vpc,
-            port=80,
+            "fargate-service",
+            cluster=ecs_cluster,
+            vpc_subnets=ec2.SubnetSelection(
+                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
+            ),
+            task_definition=task_definition,
+            assign_public_ip=True,
         )
+
+        # target_group = lb.ApplicationTargetGroup(
+        #     self,
+        #     "ecs-target-group",
+        #     vpc=vpc,
+        #     port=80,
+        # )
         # target_group.add_target(service)
 
-        alb = lb.ApplicationLoadBalancer(
-            self,
-            "alb",
-            vpc=vpc,
-            internet_facing=True,
-        )
+        # alb = lb.ApplicationLoadBalancer(
+        #     self,
+        #     "alb",
+        #     vpc=vpc,
+        #     internet_facing=True,
+        # )
 
-        listener = alb.add_listener(
-            "listener",
-            port=80,
-            open=True,
-        )
+        # listener = alb.add_listener(
+        #     "listener",
+        #     port=80,
+        #     open=True,
+        # )
 
-        listener.add_target_groups(
-            "ecs-target-group", target_groups=[target_group]
-        )
+        # listener.add_target_groups(
+        #     "ecs-target-group", target_groups=[target_group]
+        # )
