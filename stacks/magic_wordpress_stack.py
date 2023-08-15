@@ -105,7 +105,7 @@ class MagicWordpressStack(Stack):
             vpc=vpc,
             cluster_name="magic-wordpress",
             default_cloud_map_namespace=ecs.CloudMapNamespaceOptions(
-                name="wordpress",
+                name="wordpress.elevator-robot.com",
                 type=cloudmap.NamespaceType.DNS_PUBLIC,
                 vpc=vpc,
             ),
@@ -172,6 +172,7 @@ class MagicWordpressStack(Stack):
             ),
             task_definition=task_definition,
             assign_public_ip=True,
+            service_name="wordpress",
         )
 
         target_group = lb.ApplicationTargetGroup(
@@ -180,11 +181,11 @@ class MagicWordpressStack(Stack):
             vpc=vpc,
             port=80,
             targets=[service],
-        )
-        target_group.add_health_check(
-            port="80",
-            path="/wp-admin/install.php",
-            protocol=lb.Protocol.HTTP,
+            health_check=lb.HealthCheck(
+                path="/wp-admin/install.php",
+                port="80",
+                protocol=lb.Protocol.HTTP,
+            ),
         )
 
         alb = lb.ApplicationLoadBalancer(
